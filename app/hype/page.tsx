@@ -102,9 +102,15 @@ export default async function HypePage() {
     byStatus[item.status]?.push(item);
   });
 
+  const confirmed = byStatus.confirmed.length;
+  const busted = byStatus.busted.length;
+  const partial = byStatus.partial.length;
+  const decided = confirmed + busted + partial;
+  const accuracy = decided > 0 ? Math.round(((confirmed + partial * 0.5) / decided) * 100) : null;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">📊 Hype vs Reality Board</h1>
         <p className="mt-1 text-slate-400 text-sm">
           Big AI predictions tracked against what actually happened.
@@ -113,6 +119,21 @@ export default async function HypePage() {
           <span>✏️</span>
           <span>Manually curated — updated weekly</span>
         </div>
+      </div>
+
+      {/* Methodology note */}
+      <div className="mb-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-500 leading-relaxed">
+        <span className="font-semibold text-slate-400">How this works: </span>
+        We track significant AI predictions made publicly by researchers, executives, and organizations.
+        Verdicts are assigned when there is clear evidence the prediction was correct, incorrect, or partially true.
+        <span className="font-semibold text-slate-400"> Confirmed</span> = happened as stated.
+        <span className="font-semibold text-slate-400"> Partial</span> = directionally right but overstated/understated.
+        <span className="font-semibold text-slate-400"> Busted</span> = clearly did not happen.
+        {accuracy !== null && (
+          <span className="ml-2 text-amber-400 font-medium">
+            Current accuracy rate: {accuracy}%
+          </span>
+        )}
       </div>
 
       {/* Score summary */}
