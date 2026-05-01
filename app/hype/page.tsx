@@ -135,9 +135,9 @@ export default async function HypePage() {
         <p className="mt-1 text-slate-400 text-sm">
           Big AI predictions tracked against what actually happened.
         </p>
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded border border-amber-900/50 bg-amber-950/20 px-3 py-1 text-xs text-amber-400">
-          <span>✏️</span>
-          <span>Manually curated — updated weekly</span>
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded border border-emerald-900/50 bg-emerald-950/20 px-3 py-1 text-xs text-emerald-400">
+          <span>⚡</span>
+          <span>New predictions auto-detected — verdicts curated manually</span>
         </div>
       </div>
 
