@@ -5,8 +5,12 @@ import type { GraveyardEntry } from '@/lib/types';
 export const revalidate = 3600;
 
 export const metadata = {
-  title: 'AI Graveyard — AIWatch',
-  description: 'AI tools and startups that shut down, got acquired, or quietly disappeared.',
+  title: 'AI Graveyard',
+  description: 'Tracking AI tools and startups that shut down, got acquired, or quietly disappeared. A record of what didn\'t survive the AI hype cycle.',
+  openGraph: {
+    title: 'AI Graveyard — AIWatch',
+    description: 'AI tools and startups that shut down, got acquired, or quietly disappeared.',
+  },
 };
 
 const SEED_ENTRIES: GraveyardEntry[] = [

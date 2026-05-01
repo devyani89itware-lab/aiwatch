@@ -5,8 +5,12 @@ import type { Incident, IncidentType, Severity } from '@/lib/types';
 export const revalidate = 3600;
 
 export const metadata = {
-  title: 'AI Incident Feed — AIWatch',
-  description: 'Real-world AI failures, attacks, misuse, and harms — tagged by type, severity, and country.',
+  title: 'AI Incident Feed',
+  description: 'Real-world AI failures, attacks, deepfakes, data leaks, and misuse — tagged by type, severity, and country. Updated every 6 hours.',
+  openGraph: {
+    title: 'AI Incident Feed — AIWatch',
+    description: 'Tracking real-world AI failures, attacks, deepfakes, and misuse. Tagged by type, severity, and country.',
+  },
 };
 
 const severityOrder: Severity[] = ['critical', 'high', 'medium', 'low'];

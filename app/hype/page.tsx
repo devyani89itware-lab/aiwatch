@@ -5,8 +5,12 @@ import type { HypeItem, HypeStatus } from '@/lib/types';
 export const revalidate = 3600;
 
 export const metadata = {
-  title: 'Hype vs Reality Board — AIWatch',
-  description: 'Tracking big AI predictions against what actually happened.',
+  title: 'Hype vs Reality Board',
+  description: 'Tracking big AI predictions against what actually happened — confirmed, busted, or still pending. Cutting through the AI hype.',
+  openGraph: {
+    title: 'Hype vs Reality Board — AIWatch',
+    description: 'Big AI predictions tracked against what actually happened. Confirmed, busted, or still pending.',
+  },
 };
 
 const SEED_ITEMS: HypeItem[] = [

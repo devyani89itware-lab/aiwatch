@@ -5,8 +5,12 @@ import type { Tool } from '@/lib/types';
 export const revalidate = 3600;
 
 export const metadata = {
-  title: 'New AI Tools This Week — AIWatch',
-  description: 'Latest AI tool launches tracked weekly from Product Hunt and across the web.',
+  title: 'New AI Tools This Week',
+  description: 'Latest AI tool launches tracked automatically from Product Hunt and Hacker News. Updated every 6 hours.',
+  openGraph: {
+    title: 'New AI Tools This Week — AIWatch',
+    description: 'Fresh AI tool launches tracked automatically from Product Hunt and Hacker News.',
+  },
 };
 
 export default async function ToolsPage() {

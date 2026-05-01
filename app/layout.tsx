@@ -7,10 +7,41 @@ import Footer from '@/components/Footer';
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
+const siteUrl = 'https://aiwatch-eight.vercel.app';
+
 export const metadata: Metadata = {
-  title: 'AIWatch — AI News, Incidents & Reality Check',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'AIWatch — AI News, Incidents & Reality Check',
+    template: '%s — AIWatch',
+  },
   description:
-    'Track AI incidents, daily AI news, new tool launches, the AI graveyard, and hype vs reality — all in one place.',
+    'Track real-world AI failures, attacks & misuse. Curated AI news from 15+ sources, new tool launches, AI graveyard, and hype vs reality — updated every 6 hours.',
+  keywords: [
+    'AI news', 'AI incidents', 'AI safety', 'artificial intelligence',
+    'deepfake', 'AI tools', 'AI graveyard', 'AI hype', 'machine learning news',
+  ],
+  authors: [{ name: 'AIWatch' }],
+  openGraph: {
+    type: 'website',
+    siteName: 'AIWatch',
+    title: 'AIWatch — AI News, Incidents & Reality Check',
+    description:
+      'Track real-world AI failures, attacks & misuse. Curated AI news, new tools, AI graveyard, and hype vs reality — updated every 6 hours.',
+    url: siteUrl,
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'AIWatch' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'AIWatch — AI News, Incidents & Reality Check',
+    description:
+      'Track real-world AI failures, attacks & misuse. Updated every 6 hours.',
+    images: ['/og-image.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

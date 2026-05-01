@@ -5,8 +5,12 @@ import type { NewsItem } from '@/lib/types';
 export const revalidate = 3600;
 
 export const metadata = {
-  title: "Today's AI News — AIWatch",
-  description: 'AI news aggregated from 15+ trusted sources, updated every 6 hours.',
+  title: "Today's AI News",
+  description: 'AI news aggregated from 15+ trusted sources including TechCrunch, The Verge, VentureBeat, and more. Updated every 6 hours.',
+  openGraph: {
+    title: "Today's AI News — AIWatch",
+    description: 'AI news from 15+ sources, aggregated and updated every 6 hours. No fluff.',
+  },
 };
 
 export default async function NewsPage() {
