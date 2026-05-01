@@ -53,8 +53,30 @@ const TYPE_PATTERNS: { type: string; keywords: string[] }[] = [
   { type: 'privacy', keywords: ['ai surveillance', 'ai tracking', 'privacy invasion', 'facial recognition abuse'] },
 ];
 
-const SEVERITY_HIGH = ['critical', 'major', 'massive', 'widespread', 'millions', 'billion', 'national', 'government', 'federal', 'breach'];
-const SEVERITY_LOW = ['minor', 'small', 'limited', 'isolated', 'single', 'one person'];
+const SEVERITY_CRITICAL = [
+  'nation-state', 'critical infrastructure', 'national security', 'cyberwar',
+  'billions of', 'hundreds of millions', 'hospital', 'medical', 'power grid',
+  'election', 'military', 'nuclear', 'assassination', 'genocide',
+];
+
+const SEVERITY_HIGH = [
+  'millions of', 'millions of users', 'widespread', 'massive breach', 'large-scale',
+  'federal', 'government', 'law enforcement', 'arrested', 'indicted', 'charged',
+  'deepfake scam', 'voice clone fraud', 'financial fraud', 'identity theft',
+  'data breach', 'exposed data', 'leaked database', 'ransomware',
+  'child', 'minor', 'vulnerable', 'discrimination lawsuit', 'wrongful',
+];
+
+const SEVERITY_MEDIUM = [
+  'thousands', 'hundreds of users', 'company', 'startup', 'bias found',
+  'hallucination', 'misinformation', 'false information', 'privacy concern',
+  'sued', 'lawsuit', 'complaint', 'investigation',
+];
+
+const SEVERITY_LOW = [
+  'minor', 'small', 'limited', 'isolated', 'single user', 'one person',
+  'researcher found', 'proof of concept', 'theoretical', 'demo', 'test',
+];
 
 // ─── Country Detection ────────────────────────────────────────────────────────
 const COUNTRIES = [
@@ -95,9 +117,15 @@ function detectIncidentType(text: string): string {
 
 function detectSeverity(text: string): string {
   const lower = text.toLowerCase();
+  if (SEVERITY_CRITICAL.some((kw) => lower.includes(kw))) return 'critical';
   if (SEVERITY_HIGH.some((kw) => lower.includes(kw))) return 'high';
   if (SEVERITY_LOW.some((kw) => lower.includes(kw))) return 'low';
-  return 'medium';
+  if (SEVERITY_MEDIUM.some((kw) => lower.includes(kw))) return 'medium';
+  // Default based on incident type
+  const type = detectIncidentType(text);
+  if (['deepfake', 'attack', 'scam'].includes(type)) return 'high';
+  if (['data-leak', 'prompt-injection'].includes(type)) return 'medium';
+  return 'low';
 }
 
 function detectCountry(text: string): string | null {
