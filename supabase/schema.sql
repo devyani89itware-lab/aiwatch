@@ -40,7 +40,7 @@ create table if not exists tools (
   created_at timestamptz default now()
 );
 
--- Graveyard table (AI Graveyard - manual entries)
+-- Graveyard table (AI Graveyard)
 create table if not exists graveyard (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -49,10 +49,11 @@ create table if not exists graveyard (
   reason text not null default 'shutdown',
   acquired_by text,
   notes text not null default '',
+  source_url text unique,
   created_at timestamptz default now()
 );
 
--- Hype items table (Hype vs Reality Board - manual entries)
+-- Hype items table (Hype vs Reality Board)
 create table if not exists hype_items (
   id uuid default gen_random_uuid() primary key,
   prediction text not null,
@@ -61,6 +62,7 @@ create table if not exists hype_items (
   reality text,
   status text not null default 'pending',
   verdict_date date,
+  source_url text unique,
   created_at timestamptz default now()
 );
 
