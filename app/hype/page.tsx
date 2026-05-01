@@ -74,6 +74,26 @@ const SEED_ITEMS: HypeItem[] = [
     verdict_date: '2024-12-01',
     created_at: '2024-01-01',
   },
+  {
+    id: '7',
+    prediction: 'AI agents will autonomously complete complex multi-day work tasks by end of 2025',
+    predicted_by: 'Multiple AI lab CEOs and researchers (2024)',
+    predicted_at: '2024-06-01',
+    reality: null,
+    status: 'pending',
+    verdict_date: null,
+    created_at: '2024-06-01',
+  },
+  {
+    id: '8',
+    prediction: 'AI will write 50% of all code at major tech companies by 2025',
+    predicted_by: 'Jensen Huang, NVIDIA CEO (2024)',
+    predicted_at: '2024-03-01',
+    reality: null,
+    status: 'pending',
+    verdict_date: null,
+    created_at: '2024-03-01',
+  },
 ];
 
 const statusOrder: HypeStatus[] = ['pending', 'confirmed', 'partial', 'busted'];
@@ -132,6 +152,7 @@ export default async function HypePage() {
         {accuracy !== null && (
           <span className="ml-2 text-amber-400 font-medium">
             Current accuracy rate: {accuracy}%
+            <span className="text-slate-600 font-normal ml-1">(based on {decided} decided prediction{decided !== 1 ? 's' : ''})</span>
           </span>
         )}
       </div>

@@ -176,6 +176,9 @@ function cleanDescription(html: string | undefined): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/\s+/g, ' ')
+    .replace(/\s*\[…\]\s*$/, '')
+    .replace(/\s*\[\.\.\.\]\s*$/, '')
+    .replace(/\s*…\s*$/, '')
     .trim()
     .slice(0, 800);
 }

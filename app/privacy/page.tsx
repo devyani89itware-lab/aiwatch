@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
-      <p className="text-slate-500 text-sm mb-10">Last updated: May 2026</p>
+      <p className="text-slate-500 text-sm mb-10">Last updated: May 1, 2026</p>
 
       <div className="space-y-8 text-sm leading-7 text-slate-300">
         <section>
@@ -62,6 +62,16 @@ export default function PrivacyPage() {
           </p>
         </section>
       </div>
+
+        <section>
+          <h2 className="text-base font-semibold text-white mb-2">Contact</h2>
+          <p className="text-slate-400">
+            For any privacy-related questions or requests, contact us at{' '}
+            <a href="mailto:devyani89itware@gmail.com" className="text-blue-400 hover:underline">
+              devyani89itware@gmail.com
+            </a>.
+          </p>
+        </section>
 
       <div className="mt-10 border-t border-slate-800 pt-8">
         <Link href="/" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
