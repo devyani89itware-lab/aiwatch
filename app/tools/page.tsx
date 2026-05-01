@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import ToolCard from '@/components/ToolCard';
+import ToolFilters from '@/components/ToolFilters';
 import type { Tool } from '@/lib/types';
 
 export const revalidate = 3600;
@@ -18,49 +18,24 @@ export default async function ToolsPage() {
     .from('tools')
     .select('*')
     .order('launched_at', { ascending: false })
-    .limit(60);
+    .limit(100);
 
   const tools = (data ?? []) as Tool[];
-
-  // Group by week
-  const byWeek: Record<string, Tool[]> = {};
-  tools.forEach((tool) => {
-    const date = new Date(tool.launched_at);
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const key = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    if (!byWeek[key]) byWeek[key] = [];
-    byWeek[key].push(tool);
-  });
-
-  const weeks = Object.keys(byWeek);
+  const categories = Array.from(new Set(tools.map((t) => t.category))).sort();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">🛠 New AI Tools</h1>
         <p className="mt-1 text-slate-400 text-sm">
-          Tracking fresh AI tool launches from Product Hunt, Hacker News, and more.
+          {tools.length} tools tracked from Product Hunt, Hacker News, and more.
         </p>
       </div>
 
       {tools.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="space-y-10">
-          {weeks.map((week) => (
-            <section key={week}>
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-slate-500">
-                Week of {week} ({byWeek[week].length} tools)
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {byWeek[week].map((tool) => (
-                  <ToolCard key={tool.id} tool={tool} />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+        <ToolFilters tools={tools} categories={categories} />
       )}
     </div>
   );

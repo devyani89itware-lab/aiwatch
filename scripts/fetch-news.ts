@@ -293,18 +293,30 @@ async function processToolFeeds() {
     for (const item of items) {
       if (!item.title || !item.link) continue;
 
-      const title = item.title;
-      const description = cleanDescription(item.contentSnippet ?? item.content ?? '');
-      const combined = `${title} ${description}`;
+      // Product Hunt titles are often "Name — tagline", split to get clean name + tagline
+      const rawTitle = item.title;
+      const dashIdx = rawTitle.search(/\s[—–-]\s/);
+      const name = dashIdx > 0 ? rawTitle.slice(0, dashIdx).trim() : rawTitle;
+      const tagline = dashIdx > 0 ? rawTitle.slice(dashIdx).replace(/^[\s—–-]+/, '').trim() : '';
+
+      const rssDescription = cleanDescription(item.contentSnippet ?? item.content ?? '');
+      // Prefer: RSS description > tagline > generic fallback
+      const description = rssDescription.length > 30
+        ? rssDescription
+        : tagline.length > 10
+          ? tagline
+          : `${name} — discovered via ${feed.source}`;
+
+      const combined = `${rawTitle} ${rssDescription}`;
 
       if (!isAiRelated(combined)) continue;
-      if (feed.source === 'Hacker News' && !isToolLaunch(title)) continue;
+      if (feed.source === 'Hacker News' && !isToolLaunch(rawTitle)) continue;
 
       toolItems.push({
-        name: title,
-        description: description || title,
+        name,
+        description,
         url: item.link,
-        category: detectToolCategory(title, description),
+        category: detectToolCategory(rawTitle, description),
         launched_at: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
       });
     }
