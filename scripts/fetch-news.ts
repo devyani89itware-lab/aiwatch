@@ -29,6 +29,19 @@ const TOOL_FEEDS: { url: string; source: string }[] = [
   { url: 'https://www.therundown.ai/rss', source: 'The Rundown AI' },
 ];
 
+const GRAVEYARD_FEEDS = [
+  'https://news.google.com/rss/search?q=AI+startup+"shuts+down"&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+company+acquired&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+tool+discontinued+OR+sunset&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+startup+"winds+down"&hl=en-US&gl=US&ceid=US:en',
+];
+
+const HYPE_FEEDS = [
+  'https://news.google.com/rss/search?q=AI+will+by+2025+OR+2026+OR+2027+predicts&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q="AI+will+replace"+by+2026+OR+2027&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=artificial+intelligence+forecast+prediction+2026+OR+2027&hl=en-US&gl=US&ceid=US:en',
+];
+
 // ─── Incident Detection ───────────────────────────────────────────────────────
 
 const INCIDENT_KEYWORDS = [
@@ -92,6 +105,35 @@ const TOOL_LAUNCH_KEYWORDS = [
   'new ai tool', 'new model', 'show hn:', 'ask hn:',
 ];
 
+// ─── Graveyard Patterns ───────────────────────────────────────────────────────
+const GRAVEYARD_SHUTDOWN = [
+  /^(.+?)\s+(?:shuts?|is shutting|winds?|shut|is winding)\s+down/i,
+  /^(.+?)\s+(?:discontinues?|discontinued|is discontinued)/i,
+  /^(.+?)\s+(?:is being|will be)\s+(?:shut down|discontinued|sunset|killed)/i,
+  /^(.+?)\s+(?:sunsets?|sunsetting|killed|closing|closes)/i,
+];
+
+const GRAVEYARD_ACQUIRED_BY = [
+  /^(.+?)\s+(?:acquired|bought|purchased)\s+by\s+(.+?)(?:\s+for\b|\s+in\b|\s*[,.]|$)/i,
+  /^(.+?)\s+(?:to be acquired|to be bought)\s+by\s+(.+?)(?:\s+for\b|\s*[,.]|$)/i,
+];
+
+const GRAVEYARD_ACQUIRES = [
+  /^(.+?)\s+(?:acquires?|buys?|purchases?|snaps? up)\s+(.+?)(?:\s+for\b|\s+in\b|\s*[,.]|$)/i,
+];
+
+const GRAVEYARD_PIVOT = [
+  /^(.+?)\s+(?:pivots?|pivoting|refocuses?|rebrands?)/i,
+];
+
+// ─── Hype Patterns ────────────────────────────────────────────────────────────
+const HYPE_PATTERNS = [
+  /(?:ai|artificial intelligence|llm|gpt|robots?).+(?:will|could|may)\s+\w+.+(?:by|within|in)\s+(?:20[2-3]\d|\d+\s+years?)/i,
+  /(?:predicts?|forecasts?|expects?|says?|claims?).+(?:ai|artificial intelligence).+(?:will|could)\s+/i,
+  /(?:ai|artificial intelligence).+(?:will|could)\s+(?:replace|surpass|exceed|achieve|reach|eliminate|end|transform).+(?:by|within)\s+20[2-3]\d/i,
+  /(?:agi|superintelligence|artificial general intelligence).+(?:by|within|in)\s+(?:20[2-3]\d|\d+\s+years?)/i,
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isAiRelated(text: string): boolean {
@@ -121,7 +163,6 @@ function detectSeverity(text: string): string {
   if (SEVERITY_HIGH.some((kw) => lower.includes(kw))) return 'high';
   if (SEVERITY_LOW.some((kw) => lower.includes(kw))) return 'low';
   if (SEVERITY_MEDIUM.some((kw) => lower.includes(kw))) return 'medium';
-  // Default based on incident type
   const type = detectIncidentType(text);
   if (['deepfake', 'attack', 'scam'].includes(type)) return 'high';
   if (['data-leak', 'prompt-injection'].includes(type)) return 'medium';
@@ -129,14 +170,12 @@ function detectSeverity(text: string): string {
 }
 
 function detectCountry(text: string): string | null {
-  const found = COUNTRIES.find((c) => text.includes(c));
-  return found ?? null;
+  return COUNTRIES.find((c) => text.includes(c)) ?? null;
 }
 
 function extractTags(title: string, description: string): string[] {
   const combined = `${title} ${description}`.toLowerCase();
   const tags: string[] = [];
-
   const tagMap: Record<string, string[]> = {
     'ChatGPT': ['chatgpt', 'chat gpt'],
     'OpenAI': ['openai'],
@@ -150,13 +189,9 @@ function extractTags(title: string, description: string): string[] {
     'Healthcare': ['medical', 'healthcare', 'hospital', 'diagnosis'],
     'Finance': ['finance', 'banking', 'trading', 'fraud'],
   };
-
   for (const [tag, keywords] of Object.entries(tagMap)) {
-    if (keywords.some((kw) => combined.includes(kw))) {
-      tags.push(tag);
-    }
+    if (keywords.some((kw) => combined.includes(kw))) tags.push(tag);
   }
-
   return tags.slice(0, 5);
 }
 
@@ -184,8 +219,7 @@ function cleanDescription(html: string | undefined): string {
 }
 
 function isToolLaunch(title: string): boolean {
-  const lower = title.toLowerCase();
-  return TOOL_LAUNCH_KEYWORDS.some((kw) => lower.includes(kw));
+  return TOOL_LAUNCH_KEYWORDS.some((kw) => title.toLowerCase().includes(kw));
 }
 
 function detectToolCategory(title: string, description: string): string {
@@ -199,6 +233,53 @@ function detectToolCategory(title: string, description: string): string {
   if (text.includes('write') || text.includes('content') || text.includes('text')) return 'Writing';
   if (text.includes('business') || text.includes('enterprise') || text.includes('workflow')) return 'Productivity';
   return 'General';
+}
+
+// Clean extracted company name — remove noise words from regex captures
+function cleanName(raw: string): string {
+  return raw
+    .replace(/^(The|A|An)\s+/i, '')
+    .replace(/\s+(?:AI|startup|company|tool|platform|app|service|firm)$/i, '')
+    .trim()
+    .slice(0, 80);
+}
+
+type GraveyardResult = {
+  name: string;
+  reason: 'shutdown' | 'acquired' | 'pivot';
+  acquired_by: string | null;
+} | null;
+
+function extractGraveyardEntry(title: string): GraveyardResult {
+  // Check acquired-by patterns ("X acquired by Y")
+  for (const pattern of GRAVEYARD_ACQUIRED_BY) {
+    const m = title.match(pattern);
+    if (m) return { name: cleanName(m[1]), reason: 'acquired', acquired_by: cleanName(m[2]) };
+  }
+
+  // Check acquires patterns ("Y acquires X")
+  for (const pattern of GRAVEYARD_ACQUIRES) {
+    const m = title.match(pattern);
+    if (m) return { name: cleanName(m[2]), reason: 'acquired', acquired_by: cleanName(m[1]) };
+  }
+
+  // Check pivot patterns
+  for (const pattern of GRAVEYARD_PIVOT) {
+    const m = title.match(pattern);
+    if (m) return { name: cleanName(m[1]), reason: 'pivot', acquired_by: null };
+  }
+
+  // Check shutdown patterns
+  for (const pattern of GRAVEYARD_SHUTDOWN) {
+    const m = title.match(pattern);
+    if (m) return { name: cleanName(m[1]), reason: 'shutdown', acquired_by: null };
+  }
+
+  return null;
+}
+
+function isPrediction(title: string): boolean {
+  return HYPE_PATTERNS.some((p) => p.test(title));
 }
 
 // ─── Fetch Logic ─────────────────────────────────────────────────────────────
@@ -238,7 +319,6 @@ async function processNewsFeeds() {
       if (!isAiRelated(combined) && feed.category !== 'Research') continue;
 
       if (isIncident(combined)) {
-        // Route to incidents
         const tags = extractTags(title, description);
         incidentItems.push({
           title,
@@ -253,7 +333,6 @@ async function processNewsFeeds() {
           tags,
         });
       } else {
-        // Route to general news
         newsItems.push({
           title,
           summary: description || title,
@@ -266,7 +345,6 @@ async function processNewsFeeds() {
     }
   }
 
-  // Upsert news items (deduplicate by source_url)
   if (newsItems.length > 0) {
     const { error } = await supabase
       .from('news_items')
@@ -275,7 +353,6 @@ async function processNewsFeeds() {
     else console.log(`✅ Upserted ${newsItems.length} news items`);
   }
 
-  // Upsert incidents (deduplicate by source_url)
   if (incidentItems.length > 0) {
     const { error } = await supabase
       .from('incidents')
@@ -296,14 +373,12 @@ async function processToolFeeds() {
     for (const item of items) {
       if (!item.title || !item.link) continue;
 
-      // Product Hunt titles are often "Name — tagline", split to get clean name + tagline
       const rawTitle = item.title;
       const dashIdx = rawTitle.search(/\s[—–-]\s/);
       const name = dashIdx > 0 ? rawTitle.slice(0, dashIdx).trim() : rawTitle;
       const tagline = dashIdx > 0 ? rawTitle.slice(dashIdx).replace(/^[\s—–-]+/, '').trim() : '';
 
       const rssDescription = cleanDescription(item.contentSnippet ?? item.content ?? '');
-      // Prefer: RSS description > tagline > generic fallback
       const description = rssDescription.length > 30
         ? rssDescription
         : tagline.length > 10
@@ -311,7 +386,6 @@ async function processToolFeeds() {
           : `${name} — discovered via ${feed.source}`;
 
       const combined = `${rawTitle} ${rssDescription}`;
-
       if (!isAiRelated(combined)) continue;
       if (feed.source === 'Hacker News' && !isToolLaunch(rawTitle)) continue;
 
@@ -334,8 +408,92 @@ async function processToolFeeds() {
   }
 }
 
+async function processGraveyardFeeds() {
+  console.log('⚰️ Fetching graveyard feeds...');
+  const entries: object[] = [];
+
+  for (const url of GRAVEYARD_FEEDS) {
+    const items = await fetchFeed(url);
+    console.log(`  ${url.slice(0, 60)}…: ${items.length} items`);
+
+    for (const item of items) {
+      if (!item.title || !item.link) continue;
+
+      const title = item.title;
+      if (!isAiRelated(title + ' ' + (item.contentSnippet ?? ''))) continue;
+
+      const extracted = extractGraveyardEntry(title);
+      if (!extracted || extracted.name.length < 2 || extracted.name.length > 60) continue;
+
+      const description = cleanDescription(item.contentSnippet ?? item.content ?? '') || title;
+      const shutdownDate = item.pubDate
+        ? new Date(item.pubDate).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+
+      entries.push({
+        name: extracted.name,
+        description: description.slice(0, 400),
+        shutdown_date: shutdownDate,
+        reason: extracted.reason,
+        acquired_by: extracted.acquired_by,
+        notes: `Auto-detected from: ${item.link}`,
+        source_url: item.link,
+      });
+    }
+  }
+
+  if (entries.length > 0) {
+    const { error } = await supabase
+      .from('graveyard')
+      .upsert(entries, { onConflict: 'source_url', ignoreDuplicates: true });
+    if (error) console.error('Error upserting graveyard:', error.message);
+    else console.log(`⚰️ Upserted ${entries.length} graveyard entries`);
+  }
+}
+
+async function processHypeFeeds() {
+  console.log('📊 Fetching hype/prediction feeds...');
+  const predictions: object[] = [];
+
+  for (const url of HYPE_FEEDS) {
+    const items = await fetchFeed(url);
+    console.log(`  ${url.slice(0, 60)}…: ${items.length} items`);
+
+    for (const item of items) {
+      if (!item.title || !item.link) continue;
+
+      const title = item.title;
+      if (!isAiRelated(title)) continue;
+      if (!isPrediction(title)) continue;
+
+      // Clean up Google News source attribution "(Source Name)" at end of title
+      const cleanTitle = title.replace(/\s*-\s*[^-]+$/, '').trim();
+      const sourceName = item.creator ?? title.match(/-\s*([^-]+)$/)?.[1]?.trim() ?? 'News source';
+
+      predictions.push({
+        prediction: cleanTitle.slice(0, 500),
+        predicted_by: sourceName.slice(0, 200),
+        predicted_at: item.pubDate
+          ? new Date(item.pubDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        reality: null,
+        status: 'pending',
+        verdict_date: null,
+        source_url: item.link,
+      });
+    }
+  }
+
+  if (predictions.length > 0) {
+    const { error } = await supabase
+      .from('hype_items')
+      .upsert(predictions, { onConflict: 'source_url', ignoreDuplicates: true });
+    if (error) console.error('Error upserting hype items:', error.message);
+    else console.log(`📊 Upserted ${predictions.length} hype predictions`);
+  }
+}
+
 async function pruneOldRecords() {
-  // Keep only the last 30 days of news (to stay within Supabase free tier)
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 30);
 
@@ -360,6 +518,8 @@ async function main() {
 
   await processNewsFeeds();
   await processToolFeeds();
+  await processGraveyardFeeds();
+  await processHypeFeeds();
   await pruneOldRecords();
 
   console.log('\n✨ Done!\n');
