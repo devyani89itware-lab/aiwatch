@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const parser = new Parser({ timeout: 10000, maxRedirects: 5 });
+const parser = new Parser({ timeout: 5000, maxRedirects: 3 });
 
 // ─── Feed Definitions ─────────────────────────────────────────────────────────
 
@@ -16,18 +16,11 @@ const NEWS_FEEDS: { url: string; source: string; category: string }[] = [
   { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'TechCrunch', category: 'Industry' },
   { url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml', source: 'The Verge', category: 'Industry' },
   { url: 'https://venturebeat.com/ai/feed/', source: 'VentureBeat', category: 'Industry' },
-  { url: 'https://www.artificialintelligence-news.com/feed/', source: 'AI News', category: 'General' },
-  { url: 'https://huggingface.co/blog/feed.xml', source: 'Hugging Face', category: 'Research' },
-  { url: 'https://blog.google/technology/ai/rss/', source: 'Google AI Blog', category: 'Research' },
   { url: 'https://feeds.arstechnica.com/arstechnica/technology-lab', source: 'Ars Technica', category: 'General' },
-  { url: 'https://www.technologyreview.com/feed/', source: 'MIT Tech Review', category: 'Research' },
-  { url: 'https://feeds.feedburner.com/nvidiablog', source: 'NVIDIA Blog', category: 'Industry' },
-  { url: 'https://machinelearningmastery.com/blog/feed/', source: 'ML Mastery', category: 'Research' },
+  { url: 'https://huggingface.co/blog/feed.xml', source: 'Hugging Face', category: 'Research' },
   { url: 'https://www.marktechpost.com/feed/', source: 'MarkTechPost', category: 'Research' },
-  { url: 'https://syncedreview.com/feed/', source: 'Synced Review', category: 'Research' },
-  { url: 'https://www.analyticsvidhya.com/feed/', source: 'Analytics Vidhya', category: 'Research' },
-  { url: 'https://towardsdatascience.com/feed', source: 'Towards Data Science', category: 'Research' },
   { url: 'https://openai.com/blog/rss.xml', source: 'OpenAI Blog', category: 'Industry' },
+  { url: 'https://www.artificialintelligence-news.com/feed/', source: 'AI News', category: 'General' },
 ];
 
 const TOOL_FEEDS: { url: string; source: string }[] = [
@@ -181,7 +174,12 @@ function detectToolCategory(title: string, description: string): string {
 
 async function fetchFeed(url: string): Promise<Parser.Item[]> {
   try {
-    const feed = await parser.parseURL(url);
+    const feed = await Promise.race([
+      parser.parseURL(url),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 8000)
+      ),
+    ]);
     return feed.items ?? [];
   } catch (err) {
     console.warn(`Failed to fetch ${url}:`, (err as Error).message);
