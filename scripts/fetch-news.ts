@@ -244,13 +244,13 @@ async function processNewsFeeds() {
     else console.log(`✅ Upserted ${newsItems.length} news items`);
   }
 
-  // Upsert incidents (deduplicate by source_url via slug collision check)
+  // Upsert incidents (deduplicate by source_url)
   if (incidentItems.length > 0) {
     const { error } = await supabase
       .from('incidents')
-      .insert(incidentItems);
-    if (error) console.error('Error inserting incidents:', error.message);
-    else console.log(`🚨 Inserted ${incidentItems.length} incidents`);
+      .upsert(incidentItems, { onConflict: 'source_url', ignoreDuplicates: true });
+    if (error) console.error('Error upserting incidents:', error.message);
+    else console.log(`🚨 Upserted ${incidentItems.length} incidents`);
   }
 }
 
