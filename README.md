@@ -2,6 +2,16 @@
 
 Zero-cost AI news aggregator with a dedicated AI Incident Feed.
 
+## Screenshots
+
+![AIWatch home page](public/screenshots/home.png)
+
+![AI Graveyard](public/screenshots/graveyard.png)
+
+![Hype vs Reality Board](public/screenshots/hype.png)
+
+---
+
 **5 sections:**
 - 🚨 **AI Incident Feed** — real-world AI failures, attacks, deepfakes, data leaks (auto-tagged by type/severity/country)
 - 📰 **Today's AI News** — 15+ RSS feeds aggregated every 6 hours
