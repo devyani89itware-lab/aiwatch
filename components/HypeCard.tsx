@@ -1,3 +1,4 @@
+import HypeReactionButtons from '@/components/HypeReactionButtons';
 import type { HypeItem } from '@/lib/types';
 
 const statusConfig = {
@@ -36,13 +37,20 @@ export default function HypeCard({ item }: { item: HypeItem }) {
         <div className="border-t border-slate-800 pt-3">
           <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Reality</p>
           <p className="text-sm text-slate-300 leading-snug">{item.reality}</p>
-          {item.verdict_date && (
-            <p className="mt-1 text-xs text-slate-600">
-              Verdict: {new Date(item.verdict_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
-            </p>
-          )}
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            {item.verdict_date && (
+              <p className="text-xs text-slate-600">
+                Verdict: {new Date(item.verdict_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+              </p>
+            )}
+            {item.confidence_score != null && (
+              <p className="text-xs text-slate-700">· {item.confidence_score}% confidence</p>
+            )}
+          </div>
         </div>
       )}
+
+      <HypeReactionButtons itemId={item.id} />
     </div>
   );
 }

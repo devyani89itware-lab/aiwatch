@@ -1,10 +1,11 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import Parser from 'rss-parser';
 import slugify from 'slugify';
 
 // ─── Supabase (uses service role key for write access) ────────────────────────
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
@@ -34,6 +35,12 @@ const GRAVEYARD_FEEDS = [
   'https://news.google.com/rss/search?q=AI+company+acquired&hl=en-US&gl=US&ceid=US:en',
   'https://news.google.com/rss/search?q=AI+tool+discontinued+OR+sunset&hl=en-US&gl=US&ceid=US:en',
   'https://news.google.com/rss/search?q=AI+startup+"winds+down"&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+company+shutdown+2026&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+startup+acquisition+2026&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=acquires+AI+startup&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+company+"ceasing+operations"&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+service+closing+OR+closed+OR+ending&hl=en-US&gl=US&ceid=US:en',
+  'https://news.google.com/rss/search?q=AI+product+killed+OR+"being+shut+down"&hl=en-US&gl=US&ceid=US:en',
 ];
 
 const HYPE_FEEDS = [
@@ -239,6 +246,7 @@ function detectToolCategory(title: string, description: string): string {
 function cleanName(raw: string): string {
   return raw
     .replace(/^(The|A|An)\s+/i, '')
+    .replace(/\s+(?:looks?\s+to|seeks?\s+to|plans?\s+to|is\s+set\s+to|moves?\s+to|wants?\s+to|aims?\s+to|tries?\s+to)$/i, '')
     .replace(/\s+(?:AI|startup|company|tool|platform|app|service|firm)$/i, '')
     .trim()
     .slice(0, 80);
@@ -494,16 +502,113 @@ async function processHypeFeeds() {
 }
 
 async function pruneOldRecords() {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
+  const newsCutoff = new Date();
+  newsCutoff.setDate(newsCutoff.getDate() - 30);
 
-  const { error } = await supabase
+  const { error: newsError } = await supabase
     .from('news_items')
     .delete()
-    .lt('published_at', cutoff.toISOString());
+    .lt('published_at', newsCutoff.toISOString());
 
-  if (error) console.warn('Prune error:', error.message);
+  if (newsError) console.warn('Prune news error:', newsError.message);
   else console.log('🗑 Pruned news items older than 30 days');
+
+  const graveyardCutoff = new Date();
+  graveyardCutoff.setDate(graveyardCutoff.getDate() - 90);
+
+  const { error: graveyardError } = await supabase
+    .from('graveyard')
+    .delete()
+    .lt('shutdown_date', graveyardCutoff.toISOString().split('T')[0]);
+
+  if (graveyardError) console.warn('Prune graveyard error:', graveyardError.message);
+  else console.log('🗑 Pruned graveyard entries older than 90 days');
+}
+
+// ─── AI Verdict Processing ────────────────────────────────────────────────────
+
+async function processHypeVerdicts() {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log('⏭ Skipping AI verdicts — no ANTHROPIC_API_KEY set');
+    return;
+  }
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const { data: pending, error } = await supabase
+    .from('hype_items')
+    .select('id, prediction, predicted_by, predicted_at')
+    .eq('status', 'pending')
+    .order('predicted_at', { ascending: true })
+    .limit(20);
+
+  if (error || !pending?.length) {
+    console.log('📊 No pending hype items to evaluate');
+    return;
+  }
+
+  console.log(`📊 Evaluating ${pending.length} pending hype items...`);
+  const today = new Date().toISOString().split('T')[0];
+  let resolved = 0;
+
+  for (const item of pending) {
+    try {
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: `Today is ${today}. Evaluate whether this AI prediction came true.
+
+Prediction: "${item.prediction}"
+Predicted by: ${item.predicted_by}
+Prediction date: ${item.predicted_at}
+
+Reply with JSON only — no other text:
+{
+  "verdict": "confirmed" | "busted" | "partial" | "pending",
+  "confidence": <integer 0-100>,
+  "reality": "<1-2 sentence factual summary of what actually happened>"
+}
+
+Rules:
+- "pending" if the deadline hasn't passed yet or you genuinely don't know
+- "confirmed" if it clearly came true as stated
+- "busted" if it clearly did not come true
+- "partial" if it came true but was overstated or understated
+- Set confidence < 60 if uncertain — it will stay pending for re-evaluation later
+- reality must be factual, not an opinion`,
+        }],
+      });
+
+      const raw = (message.content[0] as { type: string; text: string }).text.trim();
+      const json = JSON.parse(raw.replace(/^```json\n?|\n?```$/g, ''));
+
+      if (!json.verdict || typeof json.confidence !== 'number') continue;
+
+      if (json.confidence >= 70 && json.verdict !== 'pending') {
+        await supabase.from('hype_items').update({
+          status: json.verdict,
+          reality: json.reality ?? null,
+          verdict_date: today,
+          confidence_score: json.confidence,
+        }).eq('id', item.id);
+        resolved++;
+        console.log(`  ✓ [${json.confidence}%] ${json.verdict.toUpperCase()} — ${item.prediction.slice(0, 60)}…`);
+      } else {
+        await supabase.from('hype_items').update({
+          confidence_score: json.confidence,
+        }).eq('id', item.id);
+        console.log(`  ~ [${json.confidence}%] still pending — ${item.prediction.slice(0, 60)}…`);
+      }
+
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      console.warn(`  ✗ Failed to evaluate item ${item.id}:`, (err as Error).message);
+    }
+  }
+
+  console.log(`📊 Resolved ${resolved}/${pending.length} hype items`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -511,8 +616,8 @@ async function pruneOldRecords() {
 async function main() {
   console.log(`\n🤖 AIWatch Fetch Script — ${new Date().toISOString()}\n`);
 
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars');
+  if ((!process.env.SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL) || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ Missing SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY env vars');
     process.exit(1);
   }
 
@@ -520,6 +625,7 @@ async function main() {
   await processToolFeeds();
   await processGraveyardFeeds();
   await processHypeFeeds();
+  await processHypeVerdicts();
   await pruneOldRecords();
 
   console.log('\n✨ Done!\n');

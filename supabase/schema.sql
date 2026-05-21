@@ -62,6 +62,7 @@ create table if not exists hype_items (
   reality text,
   status text not null default 'pending',
   verdict_date date,
+  confidence_score integer,
   source_url text unique,
   created_at timestamptz default now()
 );

@@ -60,6 +60,7 @@ export interface GraveyardEntry {
   reason: GraveyardReason;
   acquired_by: string | null;
   notes: string;
+  source_url?: string | null;
   created_at: string;
 }
 
@@ -71,5 +72,6 @@ export interface HypeItem {
   reality: string | null;
   status: HypeStatus;
   verdict_date: string | null;
+  confidence_score?: number | null;
   created_at: string;
 }
