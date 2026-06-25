@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import PushSubscribeButton from '@/components/PushSubscribeButton';
 
 const links = [
   { href: '/incidents', label: 'Incident Feed', accent: 'text-red-400', emoji: '🚨' },
@@ -29,6 +30,7 @@ export default function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden items-center gap-1 md:flex">
+            <PushSubscribeButton />
             {links.map(({ href, label, accent }) => {
               const active = pathname.startsWith(href);
               return (
@@ -50,6 +52,7 @@ export default function Navbar() {
 
           {/* Mobile nav — emoji + visible label for accessibility */}
           <div className="flex items-center gap-1 md:hidden">
+            <PushSubscribeButton />
             {links.map(({ href, label, accent, emoji }) => {
               const active = pathname.startsWith(href);
               return (

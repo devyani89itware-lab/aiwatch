@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import Parser from 'rss-parser';
 import slugify from 'slugify';
+import webpush from 'web-push';
 
 // ─── Supabase (uses service role key for write access) ────────────────────────
 const supabase = createClient(
@@ -290,6 +291,70 @@ function isPrediction(title: string): boolean {
   return HYPE_PATTERNS.some((p) => p.test(title));
 }
 
+// ─── Push Notifications ───────────────────────────────────────────────────────
+
+async function sendPushNotifications(title: string, body: string, url: string): Promise<void> {
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY || !process.env.VAPID_EMAIL) {
+    return;
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+
+  const { data: subs } = await supabase
+    .from('push_subscriptions')
+    .select('endpoint, p256dh, auth');
+
+  if (!subs?.length) return;
+
+  const payload = JSON.stringify({ title, body, url });
+  let sent = 0;
+
+  await Promise.allSettled(
+    subs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        );
+        sent++;
+      } catch (err) {
+        if ((err as { statusCode?: number }).statusCode === 410) {
+          await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        }
+      }
+    })
+  );
+
+  if (sent > 0) console.log(`  🔔 Push sent to ${sent}/${subs.length} subscribers`);
+}
+
+// ─── Webhook Dispatch ────────────────────────────────────────────────────────
+
+async function fireWebhooks(event: string, payload: Record<string, unknown>): Promise<void> {
+  const raw = process.env.AIWATCH_WEBHOOK_URL;
+  if (!raw) return;
+
+  const urls = raw.split(',').map((u) => u.trim()).filter(Boolean);
+  const body = JSON.stringify({ event, timestamp: new Date().toISOString(), ...payload });
+
+  const results = await Promise.allSettled(
+    urls.map((url) =>
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+        .then((res) => {
+          if (!res.ok) console.warn(`  Webhook ${url} → ${res.status}`);
+          else console.log(`  Webhook fired: ${url}`);
+        })
+    )
+  );
+
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  if (failed) console.warn(`  ${failed}/${urls.length} webhooks failed`);
+}
+
 // ─── Fetch Logic ─────────────────────────────────────────────────────────────
 
 async function fetchFeed(url: string): Promise<Parser.Item[]> {
@@ -354,19 +419,42 @@ async function processNewsFeeds() {
   }
 
   if (newsItems.length > 0) {
-    const { error } = await supabase
+    const { data: insertedNews, error } = await supabase
       .from('news_items')
-      .upsert(newsItems, { onConflict: 'source_url', ignoreDuplicates: true });
+      .upsert(newsItems, { onConflict: 'source_url', ignoreDuplicates: true })
+      .select('id');
     if (error) console.error('Error upserting news:', error.message);
-    else console.log(`✅ Upserted ${newsItems.length} news items`);
+    else {
+      console.log(`✅ Upserted ${newsItems.length} news items (${insertedNews?.length ?? 0} new)`);
+      if (insertedNews?.length) {
+        await sendPushNotifications(
+          `📰 ${insertedNews.length} new AI ${insertedNews.length === 1 ? 'story' : 'stories'}`,
+          'Tap to read the latest AI news',
+          '/news'
+        );
+      }
+    }
   }
 
   if (incidentItems.length > 0) {
-    const { error } = await supabase
+    const { data: inserted, error } = await supabase
       .from('incidents')
-      .upsert(incidentItems, { onConflict: 'source_url', ignoreDuplicates: true });
+      .upsert(incidentItems, { onConflict: 'source_url', ignoreDuplicates: true })
+      .select();
     if (error) console.error('Error upserting incidents:', error.message);
-    else console.log(`🚨 Upserted ${incidentItems.length} incidents`);
+    else {
+      console.log(`🚨 Upserted ${incidentItems.length} incidents (${inserted?.length ?? 0} new)`);
+      if (inserted?.length) {
+        await fireWebhooks('incidents.new', { incidents: inserted });
+        const first = inserted[0] as { title?: string; severity?: string; slug?: string };
+        const more = inserted.length > 1 ? ` (+${inserted.length - 1} more)` : '';
+        await sendPushNotifications(
+          `🚨 New AI Incident${more}`,
+          first.title ?? 'A new AI incident was reported',
+          first.slug ? `/incidents/${first.slug}` : '/incidents'
+        );
+      }
+    }
   }
 }
 
@@ -408,11 +496,21 @@ async function processToolFeeds() {
   }
 
   if (toolItems.length > 0) {
-    const { error } = await supabase
+    const { data: insertedTools, error } = await supabase
       .from('tools')
-      .upsert(toolItems, { onConflict: 'url', ignoreDuplicates: true });
+      .upsert(toolItems, { onConflict: 'url', ignoreDuplicates: true })
+      .select('id');
     if (error) console.error('Error upserting tools:', error.message);
-    else console.log(`✅ Upserted ${toolItems.length} tools`);
+    else {
+      console.log(`✅ Upserted ${toolItems.length} tools (${insertedTools?.length ?? 0} new)`);
+      if (insertedTools?.length) {
+        await sendPushNotifications(
+          `🛠 ${insertedTools.length} new AI ${insertedTools.length === 1 ? 'tool' : 'tools'} launched`,
+          'Tap to see the latest AI tool launches',
+          '/tools'
+        );
+      }
+    }
   }
 }
 
@@ -451,11 +549,23 @@ async function processGraveyardFeeds() {
   }
 
   if (entries.length > 0) {
-    const { error } = await supabase
+    const { data: insertedGraveyard, error } = await supabase
       .from('graveyard')
-      .upsert(entries, { onConflict: 'source_url', ignoreDuplicates: true });
+      .upsert(entries, { onConflict: 'source_url', ignoreDuplicates: true })
+      .select('id, name');
     if (error) console.error('Error upserting graveyard:', error.message);
-    else console.log(`⚰️ Upserted ${entries.length} graveyard entries`);
+    else {
+      console.log(`⚰️ Upserted ${entries.length} graveyard entries (${insertedGraveyard?.length ?? 0} new)`);
+      if (insertedGraveyard?.length) {
+        const first = insertedGraveyard[0] as { name?: string };
+        const more = insertedGraveyard.length > 1 ? ` (+${insertedGraveyard.length - 1} more)` : '';
+        await sendPushNotifications(
+          `⚰️ AI Graveyard update${more}`,
+          first.name ? `${first.name} has shut down or been acquired` : 'New AI graveyard entries added',
+          '/graveyard'
+        );
+      }
+    }
   }
 }
 
@@ -493,11 +603,21 @@ async function processHypeFeeds() {
   }
 
   if (predictions.length > 0) {
-    const { error } = await supabase
+    const { data: insertedHype, error } = await supabase
       .from('hype_items')
-      .upsert(predictions, { onConflict: 'source_url', ignoreDuplicates: true });
+      .upsert(predictions, { onConflict: 'source_url', ignoreDuplicates: true })
+      .select('id');
     if (error) console.error('Error upserting hype items:', error.message);
-    else console.log(`📊 Upserted ${predictions.length} hype predictions`);
+    else {
+      console.log(`📊 Upserted ${predictions.length} hype predictions (${insertedHype?.length ?? 0} new)`);
+      if (insertedHype?.length) {
+        await sendPushNotifications(
+          `📊 ${insertedHype.length} new AI ${insertedHype.length === 1 ? 'prediction' : 'predictions'} tracked`,
+          'Tap to see hype vs reality',
+          '/hype'
+        );
+      }
+    }
   }
 }
 
