@@ -15,8 +15,10 @@ type ButtonState = 'idle' | 'subscribed' | 'loading' | 'unsupported';
 
 export default function PushSubscribeButton() {
   const [state, setState] = useState<ButtonState>('idle');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setState('unsupported');
       return;
@@ -69,7 +71,7 @@ export default function PushSubscribeButton() {
     }
   }
 
-  if (state === 'unsupported') return null;
+  if (!mounted || state === 'unsupported') return null;
 
   return (
     <button
