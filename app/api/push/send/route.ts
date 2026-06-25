@@ -8,17 +8,21 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'placeholder-service-key'
 );
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
-
 export async function POST(request: Request) {
   const secret = request.headers.get('x-push-secret');
   if (!process.env.PUSH_SECRET || secret !== process.env.PUSH_SECRET) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  if (!process.env.VAPID_EMAIL || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    return Response.json({ error: 'VAPID keys not configured' }, { status: 500 });
+  }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
 
   const { title, body, url } = (await request.json()) as {
     title: string;
@@ -45,7 +49,6 @@ export async function POST(request: Request) {
         );
         sent++;
       } catch (err) {
-        // Remove expired subscriptions
         if ((err as { statusCode?: number }).statusCode === 410) {
           await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
         }
